@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>PixelRain — Edge Detection</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: #05070a;
+      color: #e6ecf5; font-family: system-ui, -apple-system, sans-serif; }
+    body { display: flex; align-items: flex-start; }
+
+    /* Panel links, alle Regler untereinander */
+    #panel { width: 250px; flex: 0 0 250px; height: 100vh; overflow-y: auto;
+      padding: 16px 18px 28px; background: #0b0f16; border-right: 1px solid #1c2532; }
+    #panel h1 { margin: 0 0 14px; font-size: 17px; letter-spacing: 1px; font-weight: 600; }
+    #panel h2 { margin: 20px 0 4px; font-size: 11px; text-transform: uppercase;
+      letter-spacing: 1.2px; color: #6f8199; border-bottom: 1px solid #1c2532; padding-bottom: 4px; }
+    #panel label { display: flex; flex-direction: column; gap: 4px; margin: 12px 0;
+      font-size: 12.5px; color: #b9c6d8; cursor: help; }
+    #panel input[type="range"] { width: 100%; accent-color: #5b8dff; }
+    #panel label.row { flex-direction: row; align-items: center; justify-content: space-between; }
+    #panel input[type="color"] { width: 42px; height: 24px; padding: 0; background: none;
+      border: 1px solid #2a3547; border-radius: 4px; cursor: pointer; }
+    #panel input[type="checkbox"] { width: 16px; height: 16px; accent-color: #5b8dff; cursor: pointer; }
+
+    #stage { flex: 1 1 auto; height: 100vh; display: flex; align-items: center; justify-content: center; }
+    #stage canvas { display: block; }
+  </style>
+</head>
+<body>
+  <aside id="panel">
+    <h1>Edge Detection</h1>
+
+    <label title="Eigenes Bild laden. Es bleibt lokal im Browser, nichts wird hochgeladen.">
+      Bild wählen
+      <input type="file" id="bildDatei" accept="image/*" />
+    </label>
+
+    <h2>Kanten</h2>
+
+    <label title="Auflösung der Kantenberechnung. Fein = mehr Detail, grob = nur große Formen.">
+      Rasterfeinheit
+      <input type="range" id="rasterFeinheit" min="40" max="600" value="250" data-edge />
+    </label>
+
+    <label title="Ab welcher Kontraststärke etwas als Kante zählt. Hoch = nur Silhouette, niedrig = viele Details.">
+      Schwellwert
+      <input type="range" id="schwellwert" min="0" max="255" value="60" data-edge />
+    </label>
+
+    <label title="Weichzeichnung vor der Erkennung. Höher = weniger Rauschen, ruhigere Kanten.">
+      Weichzeichnung
+      <input type="range" id="weichzeichnung" min="0" max="5" value="1" data-edge />
+    </label>
+
+    <label title="Verstärkt oder dämpft die erkannte Kantenstärke (Gain). Holt feine Kanten hervor.">
+      Kanten-Verstärkung
+      <input type="range" id="verstaerkung" min="0.2" max="5" step="0.1" value="1" data-edge />
+    </label>
+
+    <label title="Strichstärke, mit der die Kanten gezeichnet werden.">
+      Kanten-Dicke
+      <input type="range" id="dicke" min="0.5" max="6" step="0.5" value="1.5" data-edge />
+    </label>
+
+    <label title="Transparenz der Kantenlinien. Niedrig = zart, hoch = kräftig.">
+      Kanten-Deckkraft
+      <input type="range" id="deckkraft" min="0" max="255" value="255" data-edge />
+    </label>
+
+    <label class="row" title="Macht dicke Kantenbänder zu dünnen, sauberen Linien (Non-Maximum-Suppression).">
+      Ausdünnen
+      <input type="checkbox" id="ausduennen" data-edge />
+    </label>
+
+    <label class="row" title="Kanten je nach Stärke sanft heller/dunkler statt hart schwarz/weiß (Anti-Aliasing).">
+      Weiche Kanten
+      <input type="checkbox" id="weicheKanten" data-edge />
+    </label>
+
+    <label class="row" title="Vertauscht Kanten- und Hintergrundfarbe.">
+      Invertieren
+      <input type="checkbox" id="invertieren" data-edge />
+    </label>
+
+    <label class="row" title="Farbe der Kantenlinien.">
+      Kantenfarbe
+      <input type="color" id="farbeKante" value="#ffffff" data-edge />
+    </label>
+
+    <label class="row" title="Hintergrundfarbe des Canvas.">
+      Hintergrund
+      <input type="color" id="farbeBg" value="#05070a" data-edge />
+    </label>
+
+    <h2>Regen</h2>
+
+    <label title="Wie viele Tropfen gleichzeitig auf dem Bildschirm sind (Dichte des Regens).">
+      Menge
+      <input type="range" id="regenMenge" min="0" max="1000" value="250" />
+    </label>
+
+    <label title="Kleinste Tropfen-Dicke. Zusammen mit dem Max ergibt sich der Bereich der Tropfengrößen.">
+      Tropfendicke Min
+      <input type="range" id="dickeMin" min="0.5" max="8" step="0.5" value="1" />
+    </label>
+
+    <label title="Größte Tropfen-Dicke. Es gibt so dünne bis dicke Tropfen wie zwischen Min und Max.">
+      Tropfendicke Max
+      <input type="range" id="dickeMax" min="0.5" max="8" step="0.5" value="2.5" />
+    </label>
+
+    <label title="Länge der Regenstreifen — unabhängig von der Dicke.">
+      Tropfenlänge
+      <input type="range" id="tropfenLaenge" min="2" max="60" value="16" />
+    </label>
+
+    <label title="Grundtempo, mit dem die Tropfen fallen.">
+      Grundgeschwindigkeit
+      <input type="range" id="grundGeschw" min="1" max="30" value="8" />
+    </label>
+
+    <label title="Wie stark sich die Fallgeschwindigkeit zwischen den Tropfen unterscheidet. 0 = alle gleich schnell.">
+      Geschwindigkeits-Variation
+      <input type="range" id="geschwVariation" min="0" max="1" step="0.05" value="0.4" />
+    </label>
+
+    <label title="Neigung der Regenstreifen (in Grad). Alle Streifen kommen parallel aus derselben Richtung — unabhängig von der Geschwindigkeit.">
+      Neigung
+      <input type="range" id="neigung" min="-60" max="60" value="0" />
+    </label>
+
+    <label title="Transparenz der Tropfen. Niedrig = zart, hoch = kräftig.">
+      Regen-Deckkraft
+      <input type="range" id="regenDeckkraft" min="0" max="255" value="200" />
+    </label>
+
+    <label class="row" title="Farbe der Regentropfen.">
+      Regenfarbe
+      <input type="color" id="farbeRegen" value="#cfe3ff" />
+    </label>
+  </aside>
+
+  <main id="stage"></main>
+
+  <script src="sketch.js"></script>
+</body>
+</html>
