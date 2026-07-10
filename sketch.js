@@ -7,6 +7,10 @@ let img;
 let edgeLayer;     // Offscreen-Buffer mit den gezeichneten Kanten
 let bgCol;         // aktuell wirksame Hintergrundfarbe (kann durch Invertieren wechseln)
 
+// Kanten als abfragbares Raster (für die Kollision der Tropfen).
+let edgeGrid;      // Uint8Array: 1 = Kante in dieser Zelle
+let gCols, gRows, gcw, gch;   // Rastermaße + Zellgröße in Canvas-Pixeln
+
 // Kurze Helfer zum Auslesen der Regler
 const num = (id) => parseFloat(document.getElementById(id).value);
 const flag = (id) => document.getElementById(id).checked;
@@ -56,6 +60,7 @@ function draw() {
   background(bgCol);
   image(edgeLayer, 0, 0);
   updateRain();
+  updateSplashes();
 }
 
 // --- Regen ---
@@ -64,9 +69,10 @@ function draw() {
 // Werte kommen live aus den Reglern. Verlässt ein Tropfen den Rand, taucht er auf
 // der Gegenseite wieder auf (Wrap) → immer volle Abdeckung, egal welche Neigung.
 let drops = [];
+let splashes = [];
 
 function newDrop() {
-  return { x: random(width), y: random(height), r: random(), rt: random() };
+  return { x: random(width), y: random(height), r: random(), rt: random(), onEdge: false };
 }
 
 function updateRain() {
@@ -80,6 +86,7 @@ function updateRain() {
   const base = num('grundGeschw');
   const varz = num('geschwVariation');
   const dmin = num('dickeMin'), dmax = num('dickeMax');
+  const prob = num('abprallWkt') / 100;   // Abprall-Wahrscheinlichkeit pro berührter Kante
 
   const c = color(colr('farbeRegen'));
   c.setAlpha(num('regenDeckkraft'));
@@ -92,8 +99,62 @@ function updateRain() {
     d.y += dy * speed;
     d.x = (d.x % width + width) % width;
     d.y = (d.y % height + height) % height;
+
+    // Kollision: nur beim ERSTEN Berühren einer Kante würfeln (nicht jeden Frame).
+    const onEdge = isEdgeAt(d.x, d.y);
+    if (onEdge && !d.onEdge && random() < prob) {
+      spawnSplash(d.x, d.y);         // Splash entsteht
+      d.x = random(width); d.y = 0;  // Original verschwindet → startet oben neu
+      d.r = random(); d.rt = random(); d.onEdge = false;
+      continue;
+    }
+    d.onEdge = onEdge;
+
     strokeWeight(thick);
     line(d.x, d.y, d.x - dx * len, d.y - dy * len);
+  }
+}
+
+// --- Abprallen / Splash ---
+// An der Kante spritzen ein paar Tropfen wie eine Fontäne weg und fallen in Kurven runter.
+const SPLASH_GRAVITY = 0.35;
+
+function spawnSplash(x, y) {
+  const mn = Math.round(num('splashMin'));
+  const mx = Math.round(num('splashMax'));
+  const n = Math.floor(random(Math.min(mn, mx), Math.max(mn, mx) + 1));
+  const weite = num('splashWeite');
+  const life = num('splashLeben');
+  const thick = num('splashDicke');
+  const len = num('splashLaenge');
+  for (let i = 0; i < n; i++) {
+    const l = life * random(0.7, 1.1);
+    splashes.push({
+      x, y,
+      vx: random(-1, 1) * weite,        // seitlich raus (Weite)
+      vy: -random(0.2, 1) * weite,      // erst nach oben, dann zieht die Schwerkraft
+      thick: thick * random(0.7, 1.2),
+      len,
+      life: l, maxLife: l,
+    });
+  }
+}
+
+function updateSplashes() {
+  const c = color(colr('farbeRegen'));
+  const baseA = num('regenDeckkraft');
+  for (let i = splashes.length - 1; i >= 0; i--) {
+    const s = splashes[i];
+    s.vy += SPLASH_GRAVITY;
+    s.x += s.vx;
+    s.y += s.vy;
+    s.life--;
+    c.setAlpha(baseA * Math.max(0, s.life / s.maxLife));  // ausblenden
+    stroke(c);
+    strokeWeight(s.thick);
+    const sp = Math.hypot(s.vx, s.vy) || 1;
+    line(s.x, s.y, s.x - (s.vx / sp) * s.len, s.y - (s.vy / sp) * s.len);
+    if (s.life <= 0) splashes.splice(i, 1);
   }
 }
 
@@ -188,6 +249,10 @@ function buildEdges() {
   const cw = width / cols;
   const ch = height / rows;
 
+  // Raster für die Kollision (mit den Canvas-Maßen merken).
+  edgeGrid = new Uint8Array(cols * rows);
+  gCols = cols; gRows = rows; gcw = cw; gch = ch;
+
   edgeLayer.clear();
   edgeLayer.strokeWeight(weight);
   const e = color(edgeCol);
@@ -198,11 +263,20 @@ function buildEdges() {
       if (soft) intensity = constrain((m - thresh) / span, 0, 1);
       else intensity = m > thresh ? 1 : 0;
       if (intensity <= 0) continue;
+      edgeGrid[y * cols + x] = 1;
       e.setAlpha(intensity * opacity);
       edgeLayer.stroke(e);
       edgeLayer.point(x * cw + cw / 2, y * ch + ch / 2);
     }
   }
+}
+
+// Liegt der Punkt (x,y) auf einer Kante?
+function isEdgeAt(x, y) {
+  if (!edgeGrid || x < 0 || y < 0 || x >= width || y >= height) return false;
+  const c = Math.floor(x / gcw);
+  const r = Math.floor(y / gch);
+  return edgeGrid[r * gCols + c] === 1;
 }
 
 // 3x3-Box-Blur über das Graustufen-Raster.

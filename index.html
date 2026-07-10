@@ -140,6 +140,43 @@
       Regenfarbe
       <input type="color" id="farbeRegen" value="#cfe3ff" />
     </label>
+
+    <h2>Abprallen</h2>
+
+    <label title="Wahrscheinlichkeit, dass ein Tropfen an einer berührten Kante abprallt. Niedrig = die meisten fallen durch und prallen erst an einer späteren Kante ab.">
+      Abprall-Wahrscheinlichkeit (%)
+      <input type="range" id="abprallWkt" min="0" max="100" value="30" />
+    </label>
+
+    <label title="Minimale Anzahl der Spritzer-Tropfen pro Abprall.">
+      Splash Min
+      <input type="range" id="splashMin" min="1" max="20" value="5" />
+    </label>
+
+    <label title="Maximale Anzahl der Spritzer-Tropfen pro Abprall.">
+      Splash Max
+      <input type="range" id="splashMax" min="1" max="30" value="10" />
+    </label>
+
+    <label title="Dicke der Spritzer-Tropfen.">
+      Splash-Dicke
+      <input type="range" id="splashDicke" min="0.5" max="6" step="0.5" value="1.5" />
+    </label>
+
+    <label title="Länge der Spritzer-Streifen.">
+      Splash-Länge
+      <input type="range" id="splashLaenge" min="1" max="30" value="8" />
+    </label>
+
+    <label title="Wie weit die Spritzer seitlich/nach oben wegspritzen (Fontänen-Breite).">
+      Splash-Weite
+      <input type="range" id="splashWeite" min="1" max="20" step="0.5" value="6" />
+    </label>
+
+    <label title="Wie lange die Spritzer sichtbar bleiben, bevor sie ausblenden (in Frames).">
+      Splash-Lebensdauer
+      <input type="range" id="splashLeben" min="10" max="120" value="45" />
+    </label>
   </aside>
 
   <main id="stage"></main>
