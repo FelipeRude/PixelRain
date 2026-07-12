@@ -45,6 +45,7 @@ function setup() {
   refreshPanelUI();        // Wertanzeigen + Slider-Füllbalken initialisieren
   bgCol = colr('farbeBg');
   buildEdges();
+  initPresets();           // Preset-Spalte aufbauen + Buttons verdrahten
 
   // Bei jeder Änderung speichern. Kanten nur neu berechnen, wenn ein Kanten-Regler (data-edge)
   // bewegt wurde — Regen-Regler werden ohnehin live pro Frame gelesen.
@@ -69,7 +70,8 @@ function setup() {
     const b = ev.currentTarget;
     const lbl = b.querySelector('.lbl');   // nur den Text tauschen, das Icon bleibt
     b.disabled = true; lbl.textContent = 'GIF wird aufgenommen…';
-    saveGif('pixelrain', 5);
+    // notificationDuration: p5 blendet die "Done."-Meldung sonst nie aus (Default 0).
+    saveGif('pixelrain', 5, { notificationDuration: 10 });
     setTimeout(() => { b.disabled = false; lbl.textContent = 'GIF speichern (5s)'; }, 6000);
   });
 
@@ -442,7 +444,6 @@ function buildEdges() {
   const soft = flag('weicheKanten');
   const span = 60;                 // Übergangsbreite für weiche Kanten
   const opacity = num('deckkraft');
-  const weight = num('dicke');
   const cw = width / cols;
   const ch = height / rows;
 
@@ -469,7 +470,16 @@ function buildEdges() {
   if (flowLayer) flowLayer.clear();   // alte Spuren passen nicht mehr zur neuen Geometrie
 
   edgeLayer.clear();
-  edgeLayer.strokeWeight(weight);
+  edgeLayer.noStroke();                       // beide Formen ohne Kontur, nur Füllung
+  const viereck = flag('rasterViereck');
+  const frac = num('rasterGroesse') / 100;    // Größe als Anteil der Rasterzelle
+  // Vierecke sitzen auf ganzzahligen Zellgrenzen (round(x*cw)), die lückenlos kacheln.
+  // Der Rand (die halbe Lücke) ist ein Float und damit STUFENLOS. Damit die Kanten
+  // trotzdem auf ganzen Pixeln liegen (kein AA-Saum), wird der Float per Bayer-Dither
+  // auf floor/ceil verteilt — gleichmäßig übers Raster gestreut statt geklumpt. Beim
+  // Ziehen des Sliders ändert sich nur der Anteil der Zellen mit 1px mehr Rand → weich.
+  const gapFX = (1 - frac) * cw / 2;
+  const gapFY = (1 - frac) * ch / 2;
   const e = color(edgeCol);
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
@@ -478,8 +488,16 @@ function buildEdges() {
       edgeGrid[i] = 1;
       edgeCells.push(i);
       e.setAlpha(inten[i] * opacity);
-      edgeLayer.stroke(e);
-      edgeLayer.point(x * cw + cw / 2, y * ch + ch / 2);
+      edgeLayer.fill(e);
+      if (viereck) {
+        const d = (BAYER4[(y & 3) * 4 + (x & 3)] + 0.5) / 16;   // 0..1, gleichmäßig verteilt
+        const ix = Math.floor(gapFX + d), iy = Math.floor(gapFY + d);
+        const x0 = Math.round(x * cw) + ix, x1 = Math.round((x + 1) * cw) - ix;
+        const y0 = Math.round(y * ch) + iy, y1 = Math.round((y + 1) * ch) - iy;
+        edgeLayer.rect(x0, y0, Math.max(0, x1 - x0), Math.max(0, y1 - y0));
+      } else {
+        edgeLayer.ellipse(x * cw + cw / 2, y * ch + ch / 2, frac * cw, frac * ch);
+      }
     }
   }
 }
@@ -575,23 +593,132 @@ function refreshPanelUI() {
 // --- Einstellungen im Browser merken (localStorage) ---
 const STORE_KEY = 'pixelrain-settings';
 
-function saveSettings() {
+// Aktuelle Regler-Werte als schlichtes Objekt {id: wert} einsammeln.
+function collectSettings() {
   const data = {};
   document.querySelectorAll('#panel input:not([type=file])').forEach((el) => {
     data[el.id] = el.type === 'checkbox' ? el.checked : el.value;
   });
-  localStorage.setItem(STORE_KEY, JSON.stringify(data));
+  return data;
 }
 
-function loadSettings() {
-  const raw = localStorage.getItem(STORE_KEY);
-  if (!raw) return;
-  let data;
-  try { data = JSON.parse(raw); } catch (e) { return; }
+// Regler auf ein gespeichertes Werte-Objekt setzen (Datei-Input bleibt unberührt).
+function applySettings(data) {
   for (const id in data) {
     const el = document.getElementById(id);
     if (!el) continue;
     if (el.type === 'checkbox') el.checked = data[id];
     else el.value = data[id];
   }
+}
+
+function saveSettings() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(collectSettings()));
+}
+
+function loadSettings() {
+  const raw = localStorage.getItem(STORE_KEY);
+  if (!raw) return;
+  try { applySettings(JSON.parse(raw)); } catch (e) { /* defekt → Defaults */ }
+}
+
+// --- Presets: benannte Einstellungen mit Thumbnail (Canvas-Snapshot) ---
+// Gespeichert werden nur die Regler-Werte (nicht das Bild) plus ein kleines
+// JPEG-Thumbnail des aktuellen Canvas. Alles liegt in localStorage.
+const PRESET_KEY = 'pixelrain-presets';
+let presets = [];
+
+function loadPresets() {
+  try { presets = JSON.parse(localStorage.getItem(PRESET_KEY)) || []; }
+  catch (e) { presets = []; }
+}
+
+function persistPresets() {
+  localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+}
+
+// Kleines Thumbnail des aktuell gezeichneten Canvas als data-URL.
+function captureThumb() {
+  const src = document.querySelector('#stage canvas');
+  if (!src) return '';
+  const tw = 200;
+  const th = Math.max(1, Math.round(tw * src.height / src.width));
+  const tc = document.createElement('canvas');
+  tc.width = tw; tc.height = th;
+  tc.getContext('2d').drawImage(src, 0, 0, tw, th);
+  return tc.toDataURL('image/jpeg', 0.72);
+}
+
+function presetName() {
+  const now = new Date();
+  const d = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+  const t = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  return `Preset ${d} ${t}`;
+}
+
+function saveCurrentPreset() {
+  presets.unshift({
+    id: Date.now() + '-' + Math.round(Math.random() * 1e6),
+    name: presetName(),
+    thumb: captureThumb(),
+    settings: collectSettings(),
+  });
+  persistPresets();
+  renderPresets();
+}
+
+function deletePreset(id) {
+  const p = presets.find((x) => x.id === id);
+  if (!p) return;
+  if (!confirm(`„${p.name}" wirklich löschen?`)) return;
+  presets = presets.filter((x) => x.id !== id);
+  persistPresets();
+  renderPresets();
+}
+
+// Preset anwenden: Regler setzen, Anzeige aktualisieren, Kanten neu bauen,
+// und als aktuelle Einstellung übernehmen (buildEdges setzt auch bgCol).
+function applyPreset(id) {
+  const p = presets.find((x) => x.id === id);
+  if (!p) return;
+  applySettings(p.settings);
+  refreshPanelUI();
+  saveSettings();
+  buildEdges();
+}
+
+function renderPresets() {
+  const list = document.getElementById('presetList');
+  list.innerHTML = '';
+  if (!presets.length) {
+    const e = document.createElement('div');
+    e.className = 'empty';
+    e.textContent = 'Noch keine Presets gespeichert.';
+    list.appendChild(e);
+    return;
+  }
+  for (const p of presets) {
+    const card = document.createElement('div');
+    card.className = 'preset';
+    card.title = 'Einstellung anwenden';
+    card.innerHTML =
+      (p.thumb ? `<img src="${p.thumb}" alt="" />` : '') +
+      `<span class="preset-name">${p.name}</span>` +
+      `<button class="preset-del" title="Löschen"><span class="mi">delete</span></button>`;
+    card.addEventListener('click', (ev) => {
+      if (ev.target.closest('.preset-del')) return;   // Löschen ≠ Anwenden
+      applyPreset(p.id);
+    });
+    card.querySelector('.preset-del').addEventListener('click', () => deletePreset(p.id));
+    list.appendChild(card);
+  }
+}
+
+function initPresets() {
+  loadPresets();
+  renderPresets();
+  document.getElementById('presetToggle').addEventListener('click', () => {
+    document.body.classList.toggle('presets-open');
+  });
+  document.getElementById('btnSavePreset').addEventListener('click', saveCurrentPreset);
 }
