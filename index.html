@@ -182,6 +182,63 @@
       Splash-Lebensdauer
       <input type="range" id="splashLeben" min="10" max="120" value="45" />
     </label>
+
+    <h2>Fließen</h2>
+
+    <label title="Wie viele Fließ-Teilchen an den Kanten entlanglaufen. 0 = Effekt aus.">
+      Fluss-Menge
+      <input type="range" id="flussMenge" min="0" max="5000" value="300" />
+    </label>
+
+    <label title="Grundtempo der Fließ-Teilchen (Pixel pro Frame).">
+      Fluss-Tempo
+      <input type="range" id="flussTempo" min="0.2" max="8" step="0.1" value="1.5" />
+    </label>
+
+    <label title="1 = folgt den Konturen sklavisch, 0 = Kanten sind nur Startpunkte, alles fällt gerade runter.">
+      Kontur-Treue
+      <input type="range" id="konturTreue" min="0" max="1" step="0.05" value="0.8" />
+    </label>
+
+    <label title="Wie träge die Teilchen umlenken. 0 = sofortige Richtungswechsel, hoch = weite weiche Bögen (dürfen dabei kurz von der Kante abdriften).">
+      Trägheit (Bögen)
+      <input type="range" id="traegheit" min="0" max="0.95" step="0.05" value="0.7" />
+    </label>
+
+    <label title="Wie lange ein Teilchen fließt, bevor es woanders neu startet (in Frames, ±30% Zufall). Kurz = viele kurze Rinnsale.">
+      Lebensdauer
+      <input type="range" id="lebensdauer" min="5" max="600" value="120" />
+    </label>
+
+    <label title="Wie lange die Wasserspuren nachleuchten, bevor sie verblassen (Halbwertszeit in Frames).">
+      Spurlänge
+      <input type="range" id="spurLaenge" min="2" max="300" value="30" />
+    </label>
+
+    <label title="Strichstärke der Fließspuren.">
+      Fluss-Dicke
+      <input type="range" id="flussDicke" min="0.5" max="4" step="0.5" value="1" />
+    </label>
+
+    <label title="Transparenz der Fließspuren. Niedrig = zartes Schimmern.">
+      Fluss-Deckkraft
+      <input type="range" id="flussDeckkraft" min="0" max="255" value="180" />
+    </label>
+
+    <label title="Seitliches Zittern/Wandern der Teilchen. 0 = ruhige Bahnen.">
+      Wirbel
+      <input type="range" id="flussWirbel" min="0" max="3" step="0.1" value="0.5" />
+    </label>
+
+    <label title="Richtung (in Grad), in die frei fließende Teilchen getrieben werden, wenn sie auf keiner Kante mehr sind. 0 = senkrecht runter.">
+      Wind
+      <input type="range" id="flussWind" min="-80" max="80" value="0" />
+    </label>
+
+    <label class="row" title="Farbe der Fließspuren. Tipp: kräftige Farbe wählen, damit sie sich von der Kantenfarbe abhebt.">
+      Flussfarbe
+      <input type="color" id="farbeFluss" value="#48a8ff" />
+    </label>
   </aside>
 
   <main id="stage"></main>

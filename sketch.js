@@ -11,6 +11,13 @@ let bgCol;         // aktuell wirksame Hintergrundfarbe (kann durch Invertieren 
 let edgeGrid;      // Uint8Array: 1 = Kante in dieser Zelle
 let gCols, gRows, gcw, gch;   // Rastermaße + Zellgröße in Canvas-Pixeln
 
+// Fließen: Agenten wandern an den Kanten entlang nach unten und hinterlassen
+// Spuren in einem eigenen transparenten Buffer, der jeden Frame leicht ausblendet.
+let flowLayer;        // persistenter, transparenter Buffer für die Fließ-Spuren
+let flowAgents = [];  // Agenten in Canvas-Pixeln
+let edgeCells = [];   // Grid-Indizes aller Kantenzellen (Spawn-Punkte)
+let fadeDebt = 0;     // angesammelter Spur-Abtrag (für sehr lange Spuren, s. updateFlow)
+
 // Kurze Helfer zum Auslesen der Regler
 const num = (id) => parseFloat(document.getElementById(id).value);
 const flag = (id) => document.getElementById(id).checked;
@@ -26,6 +33,7 @@ function setup() {
   c.parent('stage');
 
   edgeLayer = createGraphics(w, h);
+  flowLayer = createGraphics(w, h);
 
   loadSettings();          // gespeicherte Regler-Werte wiederherstellen
   bgCol = colr('farbeBg');
@@ -51,6 +59,8 @@ function setup() {
       const [w, h] = fitSize();
       resizeCanvas(w, h);
       edgeLayer = createGraphics(w, h);
+      flowLayer = createGraphics(w, h);
+      flowAgents.length = 0;
       buildEdges();
     });
   });
@@ -59,6 +69,8 @@ function setup() {
 function draw() {
   background(bgCol);
   image(edgeLayer, 0, 0);
+  updateFlow();              // fadet die Spuren und zeichnet die Agenten in flowLayer
+  image(flowLayer, 0, 0);
   updateRain();
   updateSplashes();
 }
@@ -158,6 +170,143 @@ function updateSplashes() {
   }
 }
 
+// --- Fließen ---
+// Agenten spawnen auf Kantenzellen und wandern mit Abwärts-Drang an den Konturen
+// entlang ("angedockt") oder fallen frei ("fallend"). Kontur-Treue mischt beides:
+// 1 = klebt an jeder Kante, 0 = Kanten sind nur Startpunkte, alles fällt gerade runter.
+// Gezeichnet wird nur das Bewegungs-Segment des aktuellen Frames in flowLayer;
+// die Spur entsteht durch die Persistenz des Buffers, der pro Frame leicht ausblendet.
+
+function newFlowAgent(randomAge) {
+  const i = edgeCells[(Math.random() * edgeCells.length) | 0];
+  const x = (i % gCols + 0.5) * gcw + random(-0.4, 0.4) * gcw;
+  const y = (Math.floor(i / gCols) + 0.5) * gch;
+  const maxLife = num('lebensdauer') * random(0.7, 1.3);  // ±30%, sonst sterben alle im Takt
+  return { x, y, px: x, py: y,
+           vx: 0, vy: 0.5,                 // Startbewegung leicht abwärts
+           r: random(),                    // persönliche Tempo-Variation
+           dir: random() < 0.5 ? -1 : 1,   // bevorzugte Seite (verhindert Ping-Pong)
+           falling: false, tx: x, ty: y,
+           life: randomAge ? random(maxLife) : maxLife, maxLife };
+}
+
+function respawnFlowAgent(a) {
+  Object.assign(a, newFlowAgent(false));   // setzt auch px/py → keine Teleport-Linie
+}
+
+function updateFlow() {
+  // 1) Spur ausblenden — immer, auch ohne Agenten, damit Reste verschwinden.
+  //    Spurlänge = Halbwertszeit in Frames. Ein zu schwacher Pro-Frame-Fade verpufft
+  //    im 8-bit-Alpha wirkungslos (Rundung → Geisterspuren). Deshalb sammelt sich der
+  //    gewünschte Abtrag als "Schuld" an und wird erst angewendet, wenn er stark genug
+  //    ist (≥12), um sicher zu wirken — so gehen auch sehr lange Spuren ohne Reste.
+  //    erase() braucht BEIDE Argumente, sonst radiert der Default-Stroke einen Rahmen.
+  fadeDebt += 255 * (1 - Math.pow(0.5, 1 / num('spurLaenge')));
+  if (fadeDebt >= 12) {
+    const s = Math.min(90, Math.round(fadeDebt));
+    flowLayer.erase(s, s);
+    flowLayer.rect(0, 0, width, height);
+    flowLayer.noErase();
+    fadeDebt -= s;
+  }
+
+  const target = Math.round(num('flussMenge'));
+  if (target === 0 || !edgeCells.length) { flowAgents.length = 0; return; }
+
+  // Beim Auffüllen mit zufälligem Alter starten, sonst sterben alle gleichzeitig (Pulsieren).
+  while (flowAgents.length < target) flowAgents.push(newFlowAgent(true));
+  if (flowAgents.length > target) flowAgents.length = target;
+
+  const tempo = num('flussTempo');
+  const treue = num('konturTreue');
+  const wirbel = num('flussWirbel');
+  const steer = 1 - num('traegheit');   // wie schnell die Richtung umlenkt (klein = weite Bögen)
+  const windA = radians(num('flussWind'));
+  const windX = Math.sin(windA), windY = Math.cos(windA);   // Fallrichtung freier Teilchen
+  const baseA = num('flussDeckkraft');
+  const c = color(colr('farbeFluss'));
+  c.setAlpha(baseA);
+  flowLayer.stroke(c);
+  flowLayer.strokeWeight(num('flussDicke'));
+
+  for (const a of flowAgents) {
+    const speed = tempo * (0.7 + 0.6 * a.r);
+    a.px = a.x; a.py = a.y;
+    stepFlowAgent(a, speed, treue, wirbel, steer, windX, windY);
+    a.life--;
+    if (a.life <= 0 || a.y >= height || a.x < -20 || a.x > width + 20) {
+      respawnFlowAgent(a);   // Lebensende, unten raus oder per Wind seitlich raus
+      continue;
+    }
+    const lifeFrac = a.life / a.maxLife;
+    if (lifeFrac < 0.25) {
+      // Sanft ausfaden auf den letzten 25% der Lebensdauer (wie versickerndes Wasser).
+      c.setAlpha(baseA * lifeFrac * 4);
+      flowLayer.stroke(c);
+      flowLayer.line(a.px, a.py, a.x, a.y);
+      c.setAlpha(baseA);
+      flowLayer.stroke(c);
+    } else {
+      flowLayer.line(a.px, a.py, a.x, a.y);
+    }
+  }
+}
+
+function stepFlowAgent(a, speed, treue, wirbel, steer, windX, windY) {
+  // 1) Wunschrichtung bestimmen.
+  let wx, wy, sp = speed;
+  if (a.falling) {
+    wx = windX + random(-1, 1) * wirbel * 0.4;   // Wind treibt freie Teilchen
+    wy = windY;
+    sp = speed * 1.4;   // Tropfen fallen etwas schneller als sie kriechen
+    if (isEdgeAt(a.x, a.y) && random() < treue) {   // an Kante darunter andocken
+      a.falling = false;
+      const cc = Math.floor(a.x / gcw), rr = Math.floor(a.y / gch);
+      a.tx = (cc + 0.5) * gcw; a.ty = (rr + 0.5) * gch;
+    }
+  } else {
+    // Nahe genug am Ziel → nächste Zelle wählen. Großzügiger Radius statt Snappen,
+    // sonst kreisen träge Agenten um ihr Ziel bzw. brechen die Bögen ab.
+    if (Math.hypot(a.tx - a.x, a.ty - a.y) < Math.max(speed * 1.2, gcw * 0.7)) {
+      chooseNextFlowCell(a, treue);
+    }
+    wx = (a.tx - a.x) + random(-0.5, 0.5) * wirbel * 0.3;
+    wy = a.ty - a.y;
+  }
+
+  // 2) Geschwindigkeit nur begrenzt schnell umlenken (Trägheit → Bögen),
+  //    danach aufs Tempo normieren: reines Richtungs-Drehen, konstante Geschwindigkeit.
+  const wm = Math.hypot(wx, wy) || 1;
+  a.vx += ((wx / wm) * sp - a.vx) * steer;
+  a.vy += ((wy / wm) * sp - a.vy) * steer;
+  const vm = Math.hypot(a.vx, a.vy) || 1;
+  a.vx = (a.vx / vm) * sp;
+  a.vy = (a.vy / vm) * sp;
+  a.x += a.vx;
+  a.y += a.vy;
+}
+
+function chooseNextFlowCell(a, treue) {
+  if (random() > treue) { a.falling = true; return; }   // absichtlich abtropfen
+  const c = Math.floor(a.x / gcw), r = Math.floor(a.y / gch);
+  // Kandidaten in Priorität: direkt unten, diagonal unten (bevorzugte Seite zuerst),
+  // seitwärts nur mit gedrosselter Wahrscheinlichkeit (rückwärts noch seltener).
+  const cand = [
+    [c,         r + 1, 1],
+    [c + a.dir, r + 1, 1], [c - a.dir, r + 1, 0.9],
+    [c + a.dir, r,     treue], [c - a.dir, r, treue * 0.3],
+  ];
+  for (const [cc, rr, p] of cand) {
+    if (cc < 0 || cc >= gCols || rr < 0 || rr >= gRows) continue;
+    if (edgeGrid[rr * gCols + cc] && random() < p) {
+      if (cc !== c) a.dir = Math.sign(cc - c);
+      a.tx = (cc + 0.5) * gcw; a.ty = (rr + 0.5) * gch;
+      return;
+    }
+  }
+  a.falling = true;   // keine Kante in der Nachbarschaft → frei fallen
+}
+
 // Canvasgröße: Bild-Seitenverhältnis, passend in den Platz neben dem Panel (Breite + Höhe).
 function fitSize() {
   const availW = windowWidth - 250; // Panelbreite abziehen
@@ -173,6 +322,8 @@ function windowResized() {
   const [w, h] = fitSize();
   resizeCanvas(w, h);
   edgeLayer = createGraphics(w, h);
+  flowLayer = createGraphics(w, h);
+  flowAgents.length = 0;   // Positionen wären bei neuer Größe ungültig
   buildEdges();
 }
 
@@ -273,6 +424,8 @@ function buildEdges() {
   // 8) In Buffer zeichnen + Kollisions-Raster füllen.
   edgeGrid = new Uint8Array(cols * rows);
   gCols = cols; gRows = rows; gcw = cw; gch = ch;
+  edgeCells = [];   // Spawn-Punkte für die Fließ-Agenten
+  if (flowLayer) flowLayer.clear();   // alte Spuren passen nicht mehr zur neuen Geometrie
 
   edgeLayer.clear();
   edgeLayer.strokeWeight(weight);
@@ -282,6 +435,7 @@ function buildEdges() {
       const i = y * cols + x;
       if (!on[i]) continue;
       edgeGrid[i] = 1;
+      edgeCells.push(i);
       e.setAlpha(inten[i] * opacity);
       edgeLayer.stroke(e);
       edgeLayer.point(x * cw + cw / 2, y * ch + ch / 2);
