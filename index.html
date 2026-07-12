@@ -4,25 +4,111 @@
   <meta charset="UTF-8" />
   <title>PixelRain — Edge Detection</title>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0..1,0&display=block" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; background: #05070a;
       color: #e6ecf5; font-family: system-ui, -apple-system, sans-serif; }
     body { display: flex; align-items: flex-start; }
 
+    .mi { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal;
+      display: inline-block; line-height: 1; letter-spacing: normal; text-transform: none;
+      white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-smoothing: antialiased; }
+
     /* Panel links, alle Regler untereinander */
     #panel { width: 250px; flex: 0 0 250px; height: 100vh; overflow-y: auto;
-      padding: 16px 18px 28px; background: #0b0f16; border-right: 1px solid #1c2532; }
+      padding: 16px 18px 100px; background: #0b0f16; border-right: 1px solid #1c2532; }
     #panel h1 { margin: 0 0 14px; font-size: 17px; letter-spacing: 1px; font-weight: 600; }
-    #panel h2 { margin: 20px 0 4px; font-size: 11px; text-transform: uppercase;
-      letter-spacing: 1.2px; color: #6f8199; border-bottom: 1px solid #1c2532; padding-bottom: 4px; }
     #panel label { display: flex; flex-direction: column; gap: 4px; margin: 12px 0;
       font-size: 12.5px; color: #b9c6d8; cursor: help; }
-    #panel input[type="range"] { width: 100%; accent-color: #5b8dff; }
     #panel label.row { flex-direction: row; align-items: center; justify-content: space-between; }
     #panel input[type="color"] { width: 42px; height: 24px; padding: 0; background: none;
       border: 1px solid #2a3547; border-radius: 4px; cursor: pointer; }
-    #panel input[type="checkbox"] { width: 16px; height: 16px; accent-color: #5b8dff; cursor: pointer; }
+    #panel input[type="checkbox"]:not(.eye-box) { width: 16px; height: 16px;
+      accent-color: #5b8dff; cursor: pointer; }
+
+    /* Einklappbare Sektionen mit Auge-Toggle */
+    .sect { position: relative; margin-top: 14px; }
+    #panel summary { list-style: none; cursor: pointer; user-select: none; position: relative;
+      font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: #6f8199;
+      border-bottom: 1px solid #1c2532; padding: 4px 30px 4px 20px; }
+    #panel summary::-webkit-details-marker { display: none; }
+    #panel summary::before { content: 'chevron_right'; font-family: 'Material Symbols Outlined';
+      font-size: 16px; position: absolute; left: 0; top: 3px; transition: transform .15s; }
+    #panel details[open] summary::before { transform: rotate(90deg); }
+
+    /* Auge: verstecktes Checkbox-Input + sichtbares Label (Pseudo-Elemente auf <input>
+       sind in Firefox unzuverlässig). Liegt NEBEN dem summary, klappt also nichts um. */
+    .eye-box { display: none; }
+    label.eye { position: absolute; top: 0; right: 0; width: 24px; height: 22px; margin: 0;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    label.eye::before { content: 'visibility_off'; font-family: 'Material Symbols Outlined';
+      font-size: 16px; color: #46536a; }
+    .eye-box:checked + label.eye::before { content: 'visibility'; color: #5b8dff;
+      font-variation-settings: 'FILL' 1; }
+
+    /* Reglername links, eingestellter Wert rechts */
+    .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .val { color: #5b8dff; font-variant-numeric: tabular-nums; font-size: 11.5px; }
+
+    /* Einzel-Slider im selben Design wie die Doppel-Slider:
+       schlanke Spur, blauer Füllbalken (--p via JS), runder Griff. */
+    #panel input[type="range"] { width: 100%; }
+    #panel input[type="range"]:not(.dualslider input) { -webkit-appearance: none;
+      appearance: none; height: 18px; background: transparent; padding: 0; margin: 0; }
+    #panel input[type="range"]:not(.dualslider input)::-webkit-slider-runnable-track {
+      height: 4px; border-radius: 2px;
+      background: linear-gradient(to right, #5b8dff var(--p, 50%), #1c2532 var(--p, 50%)); }
+    #panel input[type="range"]:not(.dualslider input)::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none; width: 14px; height: 14px; margin-top: -5px;
+      border-radius: 50%; background: #5b8dff; border: 2px solid #0b0f16; cursor: pointer; }
+    #panel input[type="range"]:not(.dualslider input)::-moz-range-track {
+      height: 4px; border-radius: 2px; background: #1c2532; }
+    #panel input[type="range"]:not(.dualslider input)::-moz-range-progress {
+      height: 4px; border-radius: 2px; background: #5b8dff; }
+    #panel input[type="range"]:not(.dualslider input)::-moz-range-thumb {
+      width: 12px; height: 12px; border-radius: 50%; background: #5b8dff;
+      border: 2px solid #0b0f16; cursor: pointer; }
+
+    /* Doppel-Slider (Min–Max): zwei überlagerte Ranges, nur die Griffe sind klickbar */
+    .dualslider { position: relative; height: 18px; }
+    .dualslider::before { content: ''; position: absolute; left: 0; right: 0; top: 50%;
+      height: 4px; transform: translateY(-50%); background: #1c2532; border-radius: 2px; }
+    .dualslider .fill { position: absolute; top: 50%; height: 4px; transform: translateY(-50%);
+      background: #5b8dff; border-radius: 2px; }
+    .dualslider input[type="range"] { position: absolute; left: 0; top: 0; width: 100%;
+      height: 18px; margin: 0; -webkit-appearance: none; appearance: none; background: none;
+      pointer-events: none; }
+    .dualslider input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none;
+      appearance: none; pointer-events: auto; width: 14px; height: 14px; border-radius: 50%;
+      background: #5b8dff; border: 2px solid #0b0f16; cursor: pointer; }
+    .dualslider input[type="range"]::-moz-range-thumb { pointer-events: auto; width: 12px;
+      height: 12px; border-radius: 50%; background: #5b8dff; border: 2px solid #0b0f16;
+      cursor: pointer; }
+
+    /* Eigene Tooltips (statt title): erscheinen nach fester 1s-Verzögerung */
+    [data-tip] { position: relative; }
+    [data-tip]::after { content: attr(data-tip); position: absolute; left: 0; bottom: 100%;
+      margin-bottom: 6px; z-index: 50; width: max-content; max-width: 205px;
+      background: #1a2433; color: #dbe6f5; font-size: 11px; line-height: 1.45;
+      letter-spacing: normal; text-transform: none; padding: 6px 8px; border-radius: 6px;
+      border: 1px solid #2a3547; box-shadow: 0 4px 14px rgba(0,0,0,.4);
+      opacity: 0; visibility: hidden; pointer-events: none; white-space: normal;
+      transition: opacity .15s, visibility .15s; }
+    [data-tip]:hover::after { opacity: 1; visibility: visible; transition-delay: 1s; }
+    label.eye[data-tip]::after, #cornerBtns [data-tip]::after { left: auto; right: 0; }
+
+    /* Immer sichtbare Buttons unten links */
+    #cornerBtns { position: fixed; left: 12px; bottom: 12px; z-index: 20;
+      display: flex; flex-direction: column; gap: 8px; width: 170px; }
+    #cornerBtns button { background: #16202e; color: #cfe0f5; border: 1px solid #2a3547;
+      border-radius: 6px; padding: 8px 12px; font-size: 12px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 7px; }
+    #cornerBtns button .mi { font-size: 16px; color: #5b8dff; }
+    #cornerBtns button:hover { background: #1d2a3c; }
+    #cornerBtns button:disabled { opacity: .5; cursor: default; }
 
     #stage { flex: 1 1 auto; height: 100vh; display: flex; align-items: center; justify-content: center; }
     #stage canvas { display: block; }
@@ -37,209 +123,258 @@
       <input type="file" id="bildDatei" accept="image/*" />
     </label>
 
-    <h2>Kanten</h2>
+    <div class="sect">
+      <details>
+        <summary>Kanten</summary>
 
-    <label title="Auflösung der Kantenberechnung. Fein = mehr Detail, grob = nur große Formen.">
-      Rasterfeinheit
-      <input type="range" id="rasterFeinheit" min="40" max="600" value="250" data-edge />
-    </label>
+        <label title="Auflösung der Kantenberechnung. Fein = mehr Detail, grob = nur große Formen.">
+          <span class="head">Rasterfeinheit<span class="val" data-for="rasterFeinheit"></span></span>
+          <input type="range" id="rasterFeinheit" min="40" max="600" value="250" data-edge />
+        </label>
 
-    <label title="Ab welcher Kontraststärke etwas als Kante zählt. Hoch = nur Silhouette, niedrig = viele Details.">
-      Schwellwert
-      <input type="range" id="schwellwert" min="0" max="255" value="60" data-edge />
-    </label>
+        <label title="Ab welcher Kontraststärke etwas als Kante zählt. Hoch = nur Silhouette, niedrig = viele Details.">
+          <span class="head">Schwellwert<span class="val" data-for="schwellwert"></span></span>
+          <input type="range" id="schwellwert" min="0" max="255" value="60" data-edge />
+        </label>
 
-    <label title="Weichzeichnung vor der Erkennung. Höher = weniger Rauschen, ruhigere Kanten.">
-      Weichzeichnung
-      <input type="range" id="weichzeichnung" min="0" max="5" step="0.1" value="1" data-edge />
-    </label>
+        <label title="Weichzeichnung vor der Erkennung. Höher = weniger Rauschen, ruhigere Kanten.">
+          <span class="head">Weichzeichnung<span class="val" data-for="weichzeichnung"></span></span>
+          <input type="range" id="weichzeichnung" min="0" max="5" step="0.1" value="1" data-edge />
+        </label>
 
-    <label title="Verstärkt oder dämpft die erkannte Kantenstärke (Gain). Holt feine Kanten hervor.">
-      Kanten-Verstärkung
-      <input type="range" id="verstaerkung" min="0.2" max="5" step="0.1" value="1" data-edge />
-    </label>
+        <label title="Verstärkt oder dämpft die erkannte Kantenstärke (Gain). Holt feine Kanten hervor.">
+          <span class="head">Kanten-Verstärkung<span class="val" data-for="verstaerkung"></span></span>
+          <input type="range" id="verstaerkung" min="0.2" max="5" step="0.1" value="1" data-edge />
+        </label>
 
-    <label title="Strichstärke, mit der die Kanten gezeichnet werden.">
-      Kanten-Dicke
-      <input type="range" id="dicke" min="0.5" max="6" step="0.5" value="1.5" data-edge />
-    </label>
+        <label title="Strichstärke, mit der die Kanten gezeichnet werden.">
+          <span class="head">Kanten-Dicke<span class="val" data-for="dicke"></span></span>
+          <input type="range" id="dicke" min="0.5" max="6" step="0.5" value="1.5" data-edge />
+        </label>
 
-    <label title="Transparenz der Kantenlinien. Niedrig = zart, hoch = kräftig.">
-      Kanten-Deckkraft
-      <input type="range" id="deckkraft" min="0" max="255" value="255" data-edge />
-    </label>
+        <label title="Transparenz der Kantenlinien. Niedrig = zart, hoch = kräftig.">
+          <span class="head">Kanten-Deckkraft<span class="val" data-for="deckkraft"></span></span>
+          <input type="range" id="deckkraft" min="0" max="255" value="255" data-edge />
+        </label>
 
-    <label title="Trägt dicke Kantenbänder Schicht für Schicht ab, ohne dünne Linien zu entfernen. 0 = aus. Anders als der Schwellwert, der alles gleich betrifft.">
-      Kanten verdünnen
-      <input type="range" id="verduennen" min="0" max="6" step="0.1" value="0" data-edge />
-    </label>
+        <label title="Trägt dicke Kantenbänder Schicht für Schicht ab, ohne dünne Linien zu entfernen. 0 = aus. Anders als der Schwellwert, der alles gleich betrifft.">
+          <span class="head">Kanten verdünnen<span class="val" data-for="verduennen"></span></span>
+          <input type="range" id="verduennen" min="0" max="6" step="0.1" value="0" data-edge />
+        </label>
 
-    <label class="row" title="Macht dicke Kantenbänder in einem Schritt zu dünnen 1px-Linien (Non-Maximum-Suppression).">
-      Ausdünnen
-      <input type="checkbox" id="ausduennen" data-edge />
-    </label>
+        <label class="row" title="Macht dicke Kantenbänder in einem Schritt zu dünnen 1px-Linien (Non-Maximum-Suppression).">
+          Ausdünnen
+          <input type="checkbox" id="ausduennen" data-edge />
+        </label>
 
-    <label class="row" title="Kanten je nach Stärke sanft heller/dunkler statt hart schwarz/weiß (Anti-Aliasing).">
-      Weiche Kanten
-      <input type="checkbox" id="weicheKanten" data-edge />
-    </label>
+        <label class="row" title="Kanten je nach Stärke sanft heller/dunkler statt hart schwarz/weiß (Anti-Aliasing).">
+          Weiche Kanten
+          <input type="checkbox" id="weicheKanten" data-edge />
+        </label>
 
-    <label class="row" title="Vertauscht Kanten- und Hintergrundfarbe.">
-      Invertieren
-      <input type="checkbox" id="invertieren" data-edge />
-    </label>
+        <label class="row" title="Vertauscht Kanten- und Hintergrundfarbe.">
+          Invertieren
+          <input type="checkbox" id="invertieren" data-edge />
+        </label>
 
-    <label class="row" title="Farbe der Kantenlinien.">
-      Kantenfarbe
-      <input type="color" id="farbeKante" value="#ffffff" data-edge />
-    </label>
+        <label class="row" title="Farbe der Kantenlinien.">
+          Kantenfarbe
+          <input type="color" id="farbeKante" value="#ffffff" data-edge />
+        </label>
 
-    <label class="row" title="Hintergrundfarbe des Canvas.">
-      Hintergrund
-      <input type="color" id="farbeBg" value="#05070a" data-edge />
-    </label>
+        <label class="row" title="Hintergrundfarbe des Canvas.">
+          Hintergrund
+          <input type="color" id="farbeBg" value="#05070a" data-edge />
+        </label>
+      </details>
+      <input type="checkbox" id="zeigeKanten" class="eye-box" checked />
+      <label class="eye" for="zeigeKanten" title="Kanten ein-/ausblenden"></label>
+    </div>
 
-    <h2>Regen</h2>
+    <div class="sect">
+      <details>
+        <summary>Regen</summary>
 
-    <label title="Wie viele Tropfen gleichzeitig auf dem Bildschirm sind (Dichte des Regens).">
-      Menge
-      <input type="range" id="regenMenge" min="0" max="1000" value="250" />
-    </label>
+        <label title="Wie viele Tropfen gleichzeitig auf dem Bildschirm sind (Dichte des Regens).">
+          <span class="head">Menge<span class="val" data-for="regenMenge"></span></span>
+          <input type="range" id="regenMenge" min="0" max="1000" value="250" />
+        </label>
 
-    <label title="Kleinste Tropfen-Dicke. Zusammen mit dem Max ergibt sich der Bereich der Tropfengrößen.">
-      Tropfendicke Min
-      <input type="range" id="dickeMin" min="0.5" max="8" step="0.5" value="1" />
-    </label>
+        <label title="Bereich der Tropfen-Dicke: jeder Tropfen bekommt zufällig eine Dicke zwischen Min und Max.">
+          <span class="head">Tropfendicke<span class="val" data-for="dickeMin dickeMax"></span></span>
+          <div class="dualslider">
+            <div class="fill"></div>
+            <input type="range" id="dickeMin" min="0.5" max="8" step="0.5" value="1" />
+            <input type="range" id="dickeMax" min="0.5" max="8" step="0.5" value="2.5" />
+          </div>
+        </label>
 
-    <label title="Größte Tropfen-Dicke. Es gibt so dünne bis dicke Tropfen wie zwischen Min und Max.">
-      Tropfendicke Max
-      <input type="range" id="dickeMax" min="0.5" max="8" step="0.5" value="2.5" />
-    </label>
+        <label title="Bereich der Streifen-Länge: jeder Tropfen bekommt zufällig eine Länge zwischen Min und Max.">
+          <span class="head">Tropfenlänge<span class="val" data-for="tropfenLaengeMin tropfenLaengeMax"></span></span>
+          <div class="dualslider">
+            <div class="fill"></div>
+            <input type="range" id="tropfenLaengeMin" min="2" max="60" value="10" />
+            <input type="range" id="tropfenLaengeMax" min="2" max="60" value="25" />
+          </div>
+        </label>
 
-    <label title="Länge der Regenstreifen — unabhängig von der Dicke.">
-      Tropfenlänge
-      <input type="range" id="tropfenLaenge" min="2" max="60" value="16" />
-    </label>
+        <label title="Grundtempo, mit dem die Tropfen fallen.">
+          <span class="head">Grundgeschwindigkeit<span class="val" data-for="grundGeschw"></span></span>
+          <input type="range" id="grundGeschw" min="1" max="30" value="8" />
+        </label>
 
-    <label title="Grundtempo, mit dem die Tropfen fallen.">
-      Grundgeschwindigkeit
-      <input type="range" id="grundGeschw" min="1" max="30" value="8" />
-    </label>
+        <label title="Wie stark sich die Fallgeschwindigkeit zwischen den Tropfen unterscheidet. 0 = alle gleich schnell.">
+          <span class="head">Geschwindigkeits-Variation<span class="val" data-for="geschwVariation"></span></span>
+          <input type="range" id="geschwVariation" min="0" max="1" step="0.05" value="0.4" />
+        </label>
 
-    <label title="Wie stark sich die Fallgeschwindigkeit zwischen den Tropfen unterscheidet. 0 = alle gleich schnell.">
-      Geschwindigkeits-Variation
-      <input type="range" id="geschwVariation" min="0" max="1" step="0.05" value="0.4" />
-    </label>
+        <label title="Neigung der Regenstreifen (in Grad). Alle Streifen kommen parallel aus derselben Richtung — unabhängig von der Geschwindigkeit.">
+          <span class="head">Neigung<span class="val" data-for="neigung"></span></span>
+          <input type="range" id="neigung" min="-60" max="60" value="0" />
+        </label>
 
-    <label title="Neigung der Regenstreifen (in Grad). Alle Streifen kommen parallel aus derselben Richtung — unabhängig von der Geschwindigkeit.">
-      Neigung
-      <input type="range" id="neigung" min="-60" max="60" value="0" />
-    </label>
+        <label title="Transparenz der Tropfen. Niedrig = zart, hoch = kräftig.">
+          <span class="head">Regen-Deckkraft<span class="val" data-for="regenDeckkraft"></span></span>
+          <input type="range" id="regenDeckkraft" min="0" max="255" value="200" />
+        </label>
 
-    <label title="Transparenz der Tropfen. Niedrig = zart, hoch = kräftig.">
-      Regen-Deckkraft
-      <input type="range" id="regenDeckkraft" min="0" max="255" value="200" />
-    </label>
+        <label class="row" title="Farbe der Regentropfen.">
+          Regenfarbe
+          <input type="color" id="farbeRegen" value="#cfe3ff" />
+        </label>
 
-    <label class="row" title="Farbe der Regentropfen.">
-      Regenfarbe
-      <input type="color" id="farbeRegen" value="#cfe3ff" />
-    </label>
+        <label title="Wahrscheinlichkeit, dass ein Tropfen die Highlight-Farbe bekommt statt der Regenfarbe.">
+          <span class="head">Highlight-Anteil (%)<span class="val" data-for="highlightWkt"></span></span>
+          <input type="range" id="highlightWkt" min="0" max="100" value="0" />
+        </label>
 
-    <h2>Abprallen</h2>
+        <label class="row" title="Farbe der Highlight-Tropfen.">
+          Highlight-Farbe
+          <input type="color" id="farbeHighlight" value="#ffd166" />
+        </label>
+      </details>
+      <input type="checkbox" id="zeigeRegen" class="eye-box" checked />
+      <label class="eye" for="zeigeRegen" title="Regen ein-/ausblenden"></label>
+    </div>
 
-    <label title="Wahrscheinlichkeit, dass ein Tropfen an einer berührten Kante abprallt. Niedrig = die meisten fallen durch und prallen erst an einer späteren Kante ab.">
-      Abprall-Wahrscheinlichkeit (%)
-      <input type="range" id="abprallWkt" min="0" max="100" value="30" />
-    </label>
+    <div class="sect">
+      <details>
+        <summary>Abprallen</summary>
 
-    <label title="Minimale Anzahl der Spritzer-Tropfen pro Abprall.">
-      Splash Min
-      <input type="range" id="splashMin" min="1" max="20" value="5" />
-    </label>
+        <label title="Wahrscheinlichkeit, dass ein Tropfen an einer berührten Kante abprallt. Niedrig = die meisten fallen durch und prallen erst an einer späteren Kante ab.">
+          <span class="head">Abprall-Wahrscheinlichkeit (%)<span class="val" data-for="abprallWkt"></span></span>
+          <input type="range" id="abprallWkt" min="0" max="100" value="30" />
+        </label>
 
-    <label title="Maximale Anzahl der Spritzer-Tropfen pro Abprall.">
-      Splash Max
-      <input type="range" id="splashMax" min="1" max="30" value="10" />
-    </label>
+        <label title="Bereich der Spritzer-Anzahl pro Abprall: zufällig zwischen Min und Max.">
+          <span class="head">Splash-Anzahl<span class="val" data-for="splashMin splashMax"></span></span>
+          <div class="dualslider">
+            <div class="fill"></div>
+            <input type="range" id="splashMin" min="1" max="30" value="5" />
+            <input type="range" id="splashMax" min="1" max="30" value="10" />
+          </div>
+        </label>
 
-    <label title="Dicke der Spritzer-Tropfen.">
-      Splash-Dicke
-      <input type="range" id="splashDicke" min="0.5" max="6" step="0.5" value="1.5" />
-    </label>
+        <label title="Dicke der Spritzer-Tropfen.">
+          <span class="head">Splash-Dicke<span class="val" data-for="splashDicke"></span></span>
+          <input type="range" id="splashDicke" min="0.5" max="6" step="0.5" value="1.5" />
+        </label>
 
-    <label title="Länge der Spritzer-Streifen.">
-      Splash-Länge
-      <input type="range" id="splashLaenge" min="1" max="30" value="8" />
-    </label>
+        <label title="Länge der Spritzer-Streifen.">
+          <span class="head">Splash-Länge<span class="val" data-for="splashLaenge"></span></span>
+          <input type="range" id="splashLaenge" min="1" max="30" value="8" />
+        </label>
 
-    <label title="Wie weit die Spritzer seitlich/nach oben wegspritzen (Fontänen-Breite).">
-      Splash-Weite
-      <input type="range" id="splashWeite" min="1" max="20" step="0.5" value="6" />
-    </label>
+        <label title="Wie weit die Spritzer seitlich/nach oben wegspritzen (Fontänen-Breite).">
+          <span class="head">Splash-Weite<span class="val" data-for="splashWeite"></span></span>
+          <input type="range" id="splashWeite" min="1" max="20" step="0.5" value="6" />
+        </label>
 
-    <label title="Wie lange die Spritzer sichtbar bleiben, bevor sie ausblenden (in Frames).">
-      Splash-Lebensdauer
-      <input type="range" id="splashLeben" min="10" max="120" value="45" />
-    </label>
+        <label title="Wie lange die Spritzer sichtbar bleiben, bevor sie ausblenden (in Frames).">
+          <span class="head">Splash-Lebensdauer<span class="val" data-for="splashLeben"></span></span>
+          <input type="range" id="splashLeben" min="10" max="120" value="45" />
+        </label>
+      </details>
+      <input type="checkbox" id="zeigeAbprallen" class="eye-box" checked />
+      <label class="eye" for="zeigeAbprallen" title="Abprallen ein-/ausblenden"></label>
+    </div>
 
-    <h2>Fließen</h2>
+    <div class="sect">
+      <details>
+        <summary>Fließen</summary>
 
-    <label title="Wie viele Fließ-Teilchen an den Kanten entlanglaufen. 0 = Effekt aus.">
-      Fluss-Menge
-      <input type="range" id="flussMenge" min="0" max="5000" value="300" />
-    </label>
+        <label title="Wie viele Fließ-Teilchen an den Kanten entlanglaufen. 0 = Effekt aus.">
+          <span class="head">Fluss-Menge<span class="val" data-for="flussMenge"></span></span>
+          <input type="range" id="flussMenge" min="0" max="5000" value="300" />
+        </label>
 
-    <label title="Grundtempo der Fließ-Teilchen (Pixel pro Frame).">
-      Fluss-Tempo
-      <input type="range" id="flussTempo" min="0.2" max="8" step="0.1" value="1.5" />
-    </label>
+        <label title="Grundtempo der Fließ-Teilchen (Pixel pro Frame).">
+          <span class="head">Fluss-Tempo<span class="val" data-for="flussTempo"></span></span>
+          <input type="range" id="flussTempo" min="0.2" max="8" step="0.1" value="1.5" />
+        </label>
 
-    <label title="1 = folgt den Konturen sklavisch, 0 = Kanten sind nur Startpunkte, alles fällt gerade runter.">
-      Kontur-Treue
-      <input type="range" id="konturTreue" min="0" max="1" step="0.05" value="0.8" />
-    </label>
+        <label title="1 = folgt den Konturen sklavisch, 0 = Kanten sind nur Startpunkte, alles fällt gerade runter.">
+          <span class="head">Kontur-Treue<span class="val" data-for="konturTreue"></span></span>
+          <input type="range" id="konturTreue" min="0" max="1" step="0.05" value="0.8" />
+        </label>
 
-    <label title="Wie träge die Teilchen umlenken. 0 = sofortige Richtungswechsel, hoch = weite weiche Bögen (dürfen dabei kurz von der Kante abdriften).">
-      Trägheit (Bögen)
-      <input type="range" id="traegheit" min="0" max="0.95" step="0.05" value="0.7" />
-    </label>
+        <label title="Wie träge die Teilchen umlenken. 0 = sofortige Richtungswechsel, hoch = weite weiche Bögen (dürfen dabei kurz von der Kante abdriften).">
+          <span class="head">Trägheit (Bögen)<span class="val" data-for="traegheit"></span></span>
+          <input type="range" id="traegheit" min="0" max="0.95" step="0.05" value="0.7" />
+        </label>
 
-    <label title="Wie lange ein Teilchen fließt, bevor es woanders neu startet (in Frames, ±30% Zufall). Kurz = viele kurze Rinnsale.">
-      Lebensdauer
-      <input type="range" id="lebensdauer" min="5" max="600" value="120" />
-    </label>
+        <label title="Bereich der Lebensdauer in Frames: jedes Teilchen bekommt zufällig einen Wert zwischen Min und Max, dann startet es woanders neu.">
+          <span class="head">Lebensdauer<span class="val" data-for="lebensdauerMin lebensdauerMax"></span></span>
+          <div class="dualslider">
+            <div class="fill"></div>
+            <input type="range" id="lebensdauerMin" min="5" max="600" value="60" />
+            <input type="range" id="lebensdauerMax" min="5" max="600" value="180" />
+          </div>
+        </label>
 
-    <label title="Wie lange die Wasserspuren nachleuchten, bevor sie verblassen (Halbwertszeit in Frames).">
-      Spurlänge
-      <input type="range" id="spurLaenge" min="2" max="300" value="30" />
-    </label>
+        <label title="Wie lange die Wasserspuren nachleuchten, bevor sie verblassen (Halbwertszeit in Frames).">
+          <span class="head">Spurlänge<span class="val" data-for="spurLaenge"></span></span>
+          <input type="range" id="spurLaenge" min="2" max="300" value="30" />
+        </label>
 
-    <label title="Strichstärke der Fließspuren.">
-      Fluss-Dicke
-      <input type="range" id="flussDicke" min="0.5" max="4" step="0.5" value="1" />
-    </label>
+        <label title="Strichstärke der Fließspuren.">
+          <span class="head">Fluss-Dicke<span class="val" data-for="flussDicke"></span></span>
+          <input type="range" id="flussDicke" min="0.5" max="4" step="0.5" value="1" />
+        </label>
 
-    <label title="Transparenz der Fließspuren. Niedrig = zartes Schimmern.">
-      Fluss-Deckkraft
-      <input type="range" id="flussDeckkraft" min="0" max="255" value="180" />
-    </label>
+        <label title="Transparenz der Fließspuren. Niedrig = zartes Schimmern.">
+          <span class="head">Fluss-Deckkraft<span class="val" data-for="flussDeckkraft"></span></span>
+          <input type="range" id="flussDeckkraft" min="0" max="255" value="180" />
+        </label>
 
-    <label title="Seitliches Zittern/Wandern der Teilchen. 0 = ruhige Bahnen.">
-      Wirbel
-      <input type="range" id="flussWirbel" min="0" max="3" step="0.1" value="0.5" />
-    </label>
+        <label title="Seitliches Zittern/Wandern der Teilchen. 0 = ruhige Bahnen.">
+          <span class="head">Wirbel<span class="val" data-for="flussWirbel"></span></span>
+          <input type="range" id="flussWirbel" min="0" max="3" step="0.1" value="0.5" />
+        </label>
 
-    <label title="Richtung (in Grad), in die frei fließende Teilchen getrieben werden, wenn sie auf keiner Kante mehr sind. 0 = senkrecht runter.">
-      Wind
-      <input type="range" id="flussWind" min="-80" max="80" value="0" />
-    </label>
+        <label title="Richtung (in Grad), in die frei fließende Teilchen getrieben werden, wenn sie auf keiner Kante mehr sind. 0 = senkrecht runter.">
+          <span class="head">Wind<span class="val" data-for="flussWind"></span></span>
+          <input type="range" id="flussWind" min="-80" max="80" value="0" />
+        </label>
 
-    <label class="row" title="Farbe der Fließspuren. Tipp: kräftige Farbe wählen, damit sie sich von der Kantenfarbe abhebt.">
-      Flussfarbe
-      <input type="color" id="farbeFluss" value="#48a8ff" />
-    </label>
+        <label class="row" title="Farbe der Fließspuren. Tipp: kräftige Farbe wählen, damit sie sich von der Kantenfarbe abhebt.">
+          Flussfarbe
+          <input type="color" id="farbeFluss" value="#48a8ff" />
+        </label>
+      </details>
+      <input type="checkbox" id="zeigeFliessen" class="eye-box" checked />
+      <label class="eye" for="zeigeFliessen" title="Fließen ein-/ausblenden"></label>
+    </div>
   </aside>
+
+  <div id="cornerBtns">
+    <button id="btnSavePng" title="Aktuelles Bild als PNG herunterladen">
+      <span class="mi">image</span><span class="lbl">Bild speichern</span>
+    </button>
+    <button id="btnSaveGif" title="Die nächsten 5 Sekunden als GIF aufnehmen">
+      <span class="mi">movie</span><span class="lbl">GIF speichern (5s)</span>
+    </button>
+  </div>
 
   <main id="stage"></main>
 

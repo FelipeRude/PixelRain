@@ -35,7 +35,14 @@ function setup() {
   edgeLayer = createGraphics(w, h);
   flowLayer = createGraphics(w, h);
 
+  // Native title-Tooltips durch eigene CSS-Tooltips ersetzen (feste 1s-Verzögerung).
+  document.querySelectorAll('#panel [title], #cornerBtns [title]').forEach((el) => {
+    el.dataset.tip = el.title;
+    el.removeAttribute('title');
+  });
+
   loadSettings();          // gespeicherte Regler-Werte wiederherstellen
+  refreshPanelUI();        // Wertanzeigen + Slider-Füllbalken initialisieren
   bgCol = colr('farbeBg');
   buildEdges();
 
@@ -43,10 +50,28 @@ function setup() {
   // bewegt wurde — Regen-Regler werden ohnehin live pro Frame gelesen.
   document.querySelectorAll('#panel input:not([type=file])').forEach((el) =>
     el.addEventListener('input', () => {
+      // Doppel-Slider: der bewegte Griff darf den anderen nicht überholen.
+      const dual = el.closest('.dualslider');
+      if (dual) {
+        const [lo, hi] = dual.querySelectorAll('input');
+        if (el === lo && +lo.value > +hi.value) lo.value = hi.value;
+        if (el === hi && +hi.value < +lo.value) hi.value = lo.value;
+      }
+      refreshPanelUI();
       saveSettings();
       if (el.hasAttribute('data-edge')) buildEdges();
     })
   );
+
+  // Buttons unten links: PNG sofort, GIF nimmt die nächsten 5 Sekunden auf.
+  document.getElementById('btnSavePng').addEventListener('click', () => saveCanvas('pixelrain', 'png'));
+  document.getElementById('btnSaveGif').addEventListener('click', (ev) => {
+    const b = ev.currentTarget;
+    const lbl = b.querySelector('.lbl');   // nur den Text tauschen, das Icon bleibt
+    b.disabled = true; lbl.textContent = 'GIF wird aufgenommen…';
+    saveGif('pixelrain', 5);
+    setTimeout(() => { b.disabled = false; lbl.textContent = 'GIF speichern (5s)'; }, 6000);
+  });
 
   // Eigenes Bild laden.
   document.getElementById('bildDatei').addEventListener('change', (ev) => {
@@ -68,11 +93,16 @@ function setup() {
 
 function draw() {
   background(bgCol);
-  image(edgeLayer, 0, 0);
-  updateFlow();              // fadet die Spuren und zeichnet die Agenten in flowLayer
-  image(flowLayer, 0, 0);
-  updateRain();
-  updateSplashes();
+  if (flag('zeigeKanten')) image(edgeLayer, 0, 0);
+  if (flag('zeigeFliessen')) {
+    updateFlow();            // fadet die Spuren und zeichnet die Agenten in flowLayer
+    image(flowLayer, 0, 0);
+  } else {
+    flowLayer.clear();       // ausgeblendet: Spuren verwerfen, sonst poppen sie beim Einblenden
+    flowAgents.length = 0;
+  }
+  if (flag('zeigeRegen')) updateRain();
+  updateSplashes();          // prüft zeigeAbprallen selbst
 }
 
 // --- Regen ---
@@ -84,7 +114,8 @@ let drops = [];
 let splashes = [];
 
 function newDrop() {
-  return { x: random(width), y: random(height), r: random(), rt: random(), onEdge: false };
+  return { x: random(width), y: random(height), r: random(), rt: random(),
+           rl: random(), hr: random(), onEdge: false };
 }
 
 function updateRain() {
@@ -94,19 +125,24 @@ function updateRain() {
 
   const angle = radians(num('neigung'));
   const dx = Math.sin(angle), dy = Math.cos(angle);  // feste Fallrichtung für alle
-  const len = num('tropfenLaenge');
+  const lmin = num('tropfenLaengeMin'), lmax = num('tropfenLaengeMax');
   const base = num('grundGeschw');
   const varz = num('geschwVariation');
   const dmin = num('dickeMin'), dmax = num('dickeMax');
   const prob = num('abprallWkt') / 100;   // Abprall-Wahrscheinlichkeit pro berührter Kante
+  const bounce = flag('zeigeAbprallen');  // Auge zu = keine Abpraller
+  const hlProb = num('highlightWkt') / 100;
 
+  const alpha = num('regenDeckkraft');
   const c = color(colr('farbeRegen'));
-  c.setAlpha(num('regenDeckkraft'));
-  stroke(c);
+  c.setAlpha(alpha);
+  const hl = color(colr('farbeHighlight'));
+  hl.setAlpha(alpha);
 
   for (const d of drops) {
     const speed = base * (1 - varz + 2 * varz * d.r); // Tempo variiert, Winkel bleibt gleich
     const thick = dmin + (dmax - dmin) * d.rt;
+    const len = lmin + (lmax - lmin) * d.rl;
     d.x += dx * speed;
     d.y += dy * speed;
     d.x = (d.x % width + width) % width;
@@ -114,14 +150,17 @@ function updateRain() {
 
     // Kollision: nur beim ERSTEN Berühren einer Kante würfeln (nicht jeden Frame).
     const onEdge = isEdgeAt(d.x, d.y);
-    if (onEdge && !d.onEdge && random() < prob) {
+    if (bounce && onEdge && !d.onEdge && random() < prob) {
       spawnSplash(d.x, d.y);         // Splash entsteht
       d.x = random(width); d.y = 0;  // Original verschwindet → startet oben neu
-      d.r = random(); d.rt = random(); d.onEdge = false;
+      d.r = random(); d.rt = random(); d.rl = random(); d.hr = random();
+      d.onEdge = false;
       continue;
     }
     d.onEdge = onEdge;
 
+    // hr-Seed statt fester Zuordnung: der Highlight-Anteil reagiert sofort auf den Slider.
+    stroke(d.hr < hlProb ? hl : c);
     strokeWeight(thick);
     line(d.x, d.y, d.x - dx * len, d.y - dy * len);
   }
@@ -153,6 +192,7 @@ function spawnSplash(x, y) {
 }
 
 function updateSplashes() {
+  if (!flag('zeigeAbprallen')) { splashes.length = 0; return; }
   const c = color(colr('farbeRegen'));
   const baseA = num('regenDeckkraft');
   for (let i = splashes.length - 1; i >= 0; i--) {
@@ -181,7 +221,8 @@ function newFlowAgent(randomAge) {
   const i = edgeCells[(Math.random() * edgeCells.length) | 0];
   const x = (i % gCols + 0.5) * gcw + random(-0.4, 0.4) * gcw;
   const y = (Math.floor(i / gCols) + 0.5) * gch;
-  const maxLife = num('lebensdauer') * random(0.7, 1.3);  // ±30%, sonst sterben alle im Takt
+  const lLo = num('lebensdauerMin'), lHi = num('lebensdauerMax');
+  const maxLife = random(Math.min(lLo, lHi), Math.max(lLo, lHi));
   return { x, y, px: x, py: y,
            vx: 0, vy: 0.5,                 // Startbewegung leicht abwärts
            r: random(),                    // persönliche Tempo-Variation
@@ -502,6 +543,33 @@ function boxBlur(src, cols, rows) {
 function magAt(mag, cols, rows, x, y) {
   if (x < 0 || y < 0 || x >= cols || y >= rows) return 0;
   return mag[y * cols + x];
+}
+
+// --- Panel-Anzeige: Wert neben jedem Regler + Füllbalken der Slider ---
+function refreshPanelUI() {
+  document.querySelectorAll('#panel .val').forEach((s) => {
+    const ids = s.dataset.for.split(' ');
+    s.textContent = ids.map((id) => document.getElementById(id).value).join(' – ');
+  });
+  // Einzel-Slider: Füllbalken-Anteil als CSS-Variable (--p) für den Track-Gradient.
+  document.querySelectorAll('#panel input[type="range"]').forEach((el) => {
+    if (el.closest('.dualslider')) return;
+    const p = ((+el.value) - (+el.min)) / ((+el.max) - (+el.min)) * 100;
+    el.style.setProperty('--p', p + '%');
+  });
+  document.querySelectorAll('#panel .dualslider').forEach((d) => {
+    const [lo, hi] = d.querySelectorAll('input');
+    const mn = +lo.min, mx = +lo.max;
+    const p1 = ((+lo.value) - mn) / (mx - mn) * 100;
+    const p2 = ((+hi.value) - mn) / (mx - mn) * 100;
+    const fill = d.querySelector('.fill');
+    fill.style.left = p1 + '%';
+    fill.style.width = Math.max(0, p2 - p1) + '%';
+    // Liegen beide Griffe am rechten Anschlag, muss der Min-Griff oben liegen,
+    // sonst wäre er nicht mehr greifbar (Max-Input überdeckt ihn sonst immer).
+    lo.style.zIndex = (+lo.value >= mx - (mx - mn) * 0.05) ? 5 : 3;
+    hi.style.zIndex = 4;
+  });
 }
 
 // --- Einstellungen im Browser merken (localStorage) ---
