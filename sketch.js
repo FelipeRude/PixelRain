@@ -193,9 +193,14 @@ function buildEdges() {
   }
   src.remove();
 
-  // 2) Weichzeichnen (mehrere Box-Blur-Durchgänge).
-  const passes = Math.round(num('weichzeichnung'));
-  for (let p = 0; p < passes; p++) gray = boxBlur(gray, cols, rows);
+  // 2) Weichzeichnen — stufenlos: ganze Durchgänge + anteiliger letzter (Überblendung).
+  const blur = num('weichzeichnung');
+  const blurFull = Math.floor(blur), blurFrac = blur - blurFull;
+  for (let p = 0; p < blurFull; p++) gray = boxBlur(gray, cols, rows);
+  if (blurFrac > 0) {
+    const extra = boxBlur(gray, cols, rows);
+    for (let i = 0; i < gray.length; i++) gray[i] = gray[i] * (1 - blurFrac) + extra[i] * blurFrac;
+  }
 
   // 3) Sobel -> Magnitude + Richtung.
   const at = (x, y) =>
@@ -249,7 +254,23 @@ function buildEdges() {
   const cw = width / cols;
   const ch = height / rows;
 
-  // Raster für die Kollision (mit den Canvas-Maßen merken).
+  // 6) Kanten-Maske + Intensität berechnen.
+  let on = new Uint8Array(cols * rows);
+  const inten = new Float32Array(cols * rows);
+  for (let i = 0; i < cols * rows; i++) {
+    const m = keep[i];
+    const intensity = soft ? constrain((m - thresh) / span, 0, 1) : (m > thresh ? 1 : 0);
+    if (intensity > 0) { on[i] = 1; inten[i] = intensity; }
+  }
+
+  // 7) Verdünnen: dicke Bänder von außen abtragen, dünne Linien bleiben erhalten
+  //    (geschützte Erosion). Stufenlos: ganze Schichten + eine anteilige letzte Schicht.
+  const verd = num('verduennen');
+  const verdFull = Math.floor(verd), verdFrac = verd - verdFull;
+  for (let p = 0; p < verdFull; p++) on = erodeProtected(on, cols, rows, 1);
+  if (verdFrac > 0) on = erodeProtected(on, cols, rows, verdFrac);
+
+  // 8) In Buffer zeichnen + Kollisions-Raster füllen.
   edgeGrid = new Uint8Array(cols * rows);
   gCols = cols; gRows = rows; gcw = cw; gch = ch;
 
@@ -258,17 +279,44 @@ function buildEdges() {
   const e = color(edgeCol);
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
-      const m = keep[y * cols + x];
-      let intensity;
-      if (soft) intensity = constrain((m - thresh) / span, 0, 1);
-      else intensity = m > thresh ? 1 : 0;
-      if (intensity <= 0) continue;
-      edgeGrid[y * cols + x] = 1;
-      e.setAlpha(intensity * opacity);
+      const i = y * cols + x;
+      if (!on[i]) continue;
+      edgeGrid[i] = 1;
+      e.setAlpha(inten[i] * opacity);
       edgeLayer.stroke(e);
       edgeLayer.point(x * cw + cw / 2, y * ch + ch / 2);
     }
   }
+}
+
+// Eine Erosions-Runde: entfernt Rand-Pixel dicker Bänder, schützt aber dünne Linien.
+// Ein Pixel wird nur abgetragen, wenn es am Rand liegt UND genug Kanten-Nachbarn hat
+// (dünne 1-2px-Linien haben wenige Nachbarn und bleiben deshalb erhalten).
+// fraction < 1 trägt nur einen Teil der Rand-Pixel ab (per Bayer-Dither, deterministisch)
+// → stufenloser Übergang zwischen zwei ganzen Schichten.
+const ERODE_PROTECT = 4;
+const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+function erodeProtected(on, cols, rows, fraction) {
+  const out = on.slice();
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const i = y * cols + x;
+      if (!on[i]) continue;
+      let cnt = 0, boundary = false;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const xx = x + dx, yy = y + dy;
+          const isOn = xx >= 0 && yy >= 0 && xx < cols && yy < rows && on[yy * cols + xx];
+          if (isOn) cnt++; else boundary = true;
+        }
+      }
+      if (!boundary || cnt < ERODE_PROTECT) continue;
+      const t = (BAYER4[(y & 3) * 4 + (x & 3)] + 0.5) / 16;  // Schwelle 0..1
+      if (fraction >= 1 || t < fraction) out[i] = 0;
+    }
+  }
+  return out;
 }
 
 // Liegt der Punkt (x,y) auf einer Kante?
