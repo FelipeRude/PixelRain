@@ -469,17 +469,16 @@ function buildEdges() {
   edgeCells = [];   // Spawn-Punkte für die Fließ-Agenten
   if (flowLayer) flowLayer.clear();   // alte Spuren passen nicht mehr zur neuen Geometrie
 
+  // Pro Rasterzelle: Mittelpunkt bestimmen und dort eine Form zentriert draufsetzen,
+  // aber nur wenn hier eine Kante erkannt wurde (on[i]). rect zeichnet ab der linken
+  // oberen Ecke → um w/2, h/2 verschieben; ellipse ist ohnehin mittig.
+  // Größe = Anteil der Zelle (Rastergröße). Im Zufalls-Modus bekommt jede Zelle einen
+  // stabilen, per Hash bestimmten Größen-Faktor → körniger „random“ Look.
   edgeLayer.clear();
   edgeLayer.noStroke();                       // beide Formen ohne Kontur, nur Füllung
   const viereck = flag('rasterViereck');
+  const zufall = flag('rasterRandom');
   const frac = num('rasterGroesse') / 100;    // Größe als Anteil der Rasterzelle
-  // Vierecke sitzen auf ganzzahligen Zellgrenzen (round(x*cw)), die lückenlos kacheln.
-  // Der Rand (die halbe Lücke) ist ein Float und damit STUFENLOS. Damit die Kanten
-  // trotzdem auf ganzen Pixeln liegen (kein AA-Saum), wird der Float per Bayer-Dither
-  // auf floor/ceil verteilt — gleichmäßig übers Raster gestreut statt geklumpt. Beim
-  // Ziehen des Sliders ändert sich nur der Anteil der Zellen mit 1px mehr Rand → weich.
-  const gapFX = (1 - frac) * cw / 2;
-  const gapFY = (1 - frac) * ch / 2;
   const e = color(edgeCol);
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
@@ -489,15 +488,16 @@ function buildEdges() {
       edgeCells.push(i);
       e.setAlpha(inten[i] * opacity);
       edgeLayer.fill(e);
-      if (viereck) {
-        const d = (BAYER4[(y & 3) * 4 + (x & 3)] + 0.5) / 16;   // 0..1, gleichmäßig verteilt
-        const ix = Math.floor(gapFX + d), iy = Math.floor(gapFY + d);
-        const x0 = Math.round(x * cw) + ix, x1 = Math.round((x + 1) * cw) - ix;
-        const y0 = Math.round(y * ch) + iy, y1 = Math.round((y + 1) * ch) - iy;
-        edgeLayer.rect(x0, y0, Math.max(0, x1 - x0), Math.max(0, y1 - y0));
-      } else {
-        edgeLayer.ellipse(x * cw + cw / 2, y * ch + ch / 2, frac * cw, frac * ch);
+
+      const cx = x * cw + cw / 2, cy = y * ch + ch / 2;   // Zellmittelpunkt
+      let s = frac;                                       // einheitliche Größe
+      if (zufall) {
+        const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+        s = frac * (0.4 + 0.6 * (n - Math.floor(n)));     // 40–100 % der Basisgröße
       }
+      const w = s * cw, h = s * ch;
+      if (viereck) edgeLayer.rect(cx - w / 2, cy - h / 2, w, h);
+      else edgeLayer.ellipse(cx, cy, w, h);
     }
   }
 }
