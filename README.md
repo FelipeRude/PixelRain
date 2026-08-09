@@ -1,10 +1,10 @@
 # PixelRain 🌧️
 
-**Interaktive Browser-Kunst: Ein Bild wird in seine Kanten zerlegt — und dann regnet es darauf.**
+**Interaktive Browser-Kunst: Ein Bild wird in seine Kanten zerlegt und es regnet darauf.**
 
 Die Regentropfen prallen an den Konturen ab, spritzen als kleine Fontänen weg und fließen als Wasser an den Kanten entlang. Alles läuft live im Browser und lässt sich über Regler in Echtzeit verändern.
 
-### ▶️ [Hier direkt im Browser ausprobieren](https://feliperude.github.io/PixelRain/) — nichts zu installieren.
+### ▶️ [Hier direkt im Browser ausprobieren](https://feliperude.github.io/PixelRain/).
 
 | Original | Fließspuren | Raster | Raster + Fluss |
 | :---: | :---: | :---: | :---: |
