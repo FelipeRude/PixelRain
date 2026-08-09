@@ -184,37 +184,37 @@
 
         <label title="Auflösung der Kantenberechnung. Fein = mehr Detail, grob = nur große Formen.">
           <span class="head">Rasterfeinheit<span class="val" data-for="rasterFeinheit"></span></span>
-          <input type="range" id="rasterFeinheit" min="40" max="600" value="250" data-edge />
+          <input type="range" id="rasterFeinheit" min="40" max="600" value="214" data-edge />
         </label>
 
         <label title="Ab welcher Kontraststärke etwas als Kante zählt. Hoch = nur Silhouette, niedrig = viele Details.">
           <span class="head">Schwellwert<span class="val" data-for="schwellwert"></span></span>
-          <input type="range" id="schwellwert" min="0" max="255" value="60" data-edge />
+          <input type="range" id="schwellwert" min="0" max="255" value="188" data-edge />
         </label>
 
         <label title="Weichzeichnung vor der Erkennung. Höher = weniger Rauschen, ruhigere Kanten.">
           <span class="head">Weichzeichnung<span class="val" data-for="weichzeichnung"></span></span>
-          <input type="range" id="weichzeichnung" min="0" max="5" step="0.1" value="1" data-edge />
+          <input type="range" id="weichzeichnung" min="0" max="5" step="0.1" value="0.6" data-edge />
         </label>
 
         <label title="Verstärkt oder dämpft die erkannte Kantenstärke (Gain). Holt feine Kanten hervor.">
           <span class="head">Kanten-Verstärkung<span class="val" data-for="verstaerkung"></span></span>
-          <input type="range" id="verstaerkung" min="0.2" max="5" step="0.1" value="1" data-edge />
+          <input type="range" id="verstaerkung" min="0.2" max="5" step="0.1" value="0.7" data-edge />
         </label>
 
         <label title="Größe der Rasterpunkte/-vierecke als Anteil der Zelle. 100 % = Vierecke füllen die Zelle lückenlos (Mosaik).">
           <span class="head">Rastergröße (%)<span class="val" data-for="rasterGroesse"></span></span>
-          <input type="range" id="rasterGroesse" min="0" max="100" value="60" data-edge />
+          <input type="range" id="rasterGroesse" min="0" max="100" value="88" data-edge />
         </label>
 
         <label class="row" title="Rasterform: aus = runde Punkte, an = Vierecke. Beide ohne Kontur (nur Füllung).">
           Vierecke
-          <input type="checkbox" id="rasterViereck" data-edge />
+          <input type="checkbox" id="rasterViereck" checked data-edge />
         </label>
 
         <label class="row" title="An = jede Zelle bekommt eine leicht zufällige Größe (körniger, „random“ Look). Aus = alle Formen exakt gleich groß.">
           Zufällige Größe
-          <input type="checkbox" id="rasterRandom" data-edge />
+          <input type="checkbox" id="rasterRandom" checked data-edge />
         </label>
 
         <label title="Transparenz der Kantenlinien. Niedrig = zart, hoch = kräftig.">
@@ -252,7 +252,7 @@
           <input type="color" id="farbeBg" value="#05070a" data-edge />
         </label>
       </details>
-      <input type="checkbox" id="zeigeKanten" class="eye-box" checked />
+      <input type="checkbox" id="zeigeKanten" class="eye-box" />
       <label class="eye" for="zeigeKanten" title="Kanten ein-/ausblenden"></label>
     </div>
 
@@ -262,15 +262,15 @@
 
         <label title="Wie viele Tropfen gleichzeitig auf dem Bildschirm sind (Dichte des Regens).">
           <span class="head">Menge<span class="val" data-for="regenMenge"></span></span>
-          <input type="range" id="regenMenge" min="0" max="1000" value="250" />
+          <input type="range" id="regenMenge" min="0" max="1000" value="75" />
         </label>
 
         <label title="Bereich der Tropfen-Dicke: jeder Tropfen bekommt zufällig eine Dicke zwischen Min und Max.">
           <span class="head">Tropfendicke<span class="val" data-for="dickeMin dickeMax"></span></span>
           <div class="dualslider">
             <div class="fill"></div>
-            <input type="range" id="dickeMin" min="0.5" max="8" step="0.5" value="1" />
-            <input type="range" id="dickeMax" min="0.5" max="8" step="0.5" value="2.5" />
+            <input type="range" id="dickeMin" min="0.5" max="8" step="0.5" value="0.5" />
+            <input type="range" id="dickeMax" min="0.5" max="8" step="0.5" value="1.5" />
           </div>
         </label>
 
@@ -295,7 +295,7 @@
 
         <label title="Neigung der Regenstreifen (in Grad). Alle Streifen kommen parallel aus derselben Richtung — unabhängig von der Geschwindigkeit.">
           <span class="head">Neigung<span class="val" data-for="neigung"></span></span>
-          <input type="range" id="neigung" min="-60" max="60" value="0" />
+          <input type="range" id="neigung" min="-60" max="60" value="24" />
         </label>
 
         <label title="Transparenz der Tropfen. Niedrig = zart, hoch = kräftig.">
@@ -310,12 +310,12 @@
 
         <label title="Wahrscheinlichkeit, dass ein Tropfen die Highlight-Farbe bekommt statt der Regenfarbe.">
           <span class="head">Highlight-Anteil (%)<span class="val" data-for="highlightWkt"></span></span>
-          <input type="range" id="highlightWkt" min="0" max="100" value="0" />
+          <input type="range" id="highlightWkt" min="0" max="100" value="16" />
         </label>
 
         <label class="row" title="Farbe der Highlight-Tropfen.">
           Highlight-Farbe
-          <input type="color" id="farbeHighlight" value="#ffd166" />
+          <input type="color" id="farbeHighlight" value="#ff4422" />
         </label>
       </details>
       <input type="checkbox" id="zeigeRegen" class="eye-box" checked />
@@ -335,8 +335,8 @@
           <span class="head">Splash-Anzahl<span class="val" data-for="splashMin splashMax"></span></span>
           <div class="dualslider">
             <div class="fill"></div>
-            <input type="range" id="splashMin" min="1" max="30" value="5" />
-            <input type="range" id="splashMax" min="1" max="30" value="10" />
+            <input type="range" id="splashMin" min="1" max="30" value="3" />
+            <input type="range" id="splashMax" min="1" max="30" value="8" />
           </div>
         </label>
 
@@ -347,17 +347,17 @@
 
         <label title="Länge der Spritzer-Streifen.">
           <span class="head">Splash-Länge<span class="val" data-for="splashLaenge"></span></span>
-          <input type="range" id="splashLaenge" min="1" max="30" value="8" />
+          <input type="range" id="splashLaenge" min="1" max="30" value="7" />
         </label>
 
         <label title="Wie weit die Spritzer seitlich/nach oben wegspritzen (Fontänen-Breite).">
           <span class="head">Splash-Weite<span class="val" data-for="splashWeite"></span></span>
-          <input type="range" id="splashWeite" min="1" max="20" step="0.5" value="6" />
+          <input type="range" id="splashWeite" min="1" max="20" step="0.5" value="5.5" />
         </label>
 
         <label title="Wie lange die Spritzer sichtbar bleiben, bevor sie ausblenden (in Frames).">
           <span class="head">Splash-Lebensdauer<span class="val" data-for="splashLeben"></span></span>
-          <input type="range" id="splashLeben" min="10" max="120" value="45" />
+          <input type="range" id="splashLeben" min="10" max="120" value="39" />
         </label>
       </details>
       <input type="checkbox" id="zeigeAbprallen" class="eye-box" checked />
@@ -370,7 +370,7 @@
 
         <label title="Wie viele Fließ-Teilchen an den Kanten entlanglaufen. 0 = Effekt aus.">
           <span class="head">Fluss-Menge<span class="val" data-for="flussMenge"></span></span>
-          <input type="range" id="flussMenge" min="0" max="5000" value="300" />
+          <input type="range" id="flussMenge" min="0" max="5000" value="1181" />
         </label>
 
         <label title="Grundtempo der Fließ-Teilchen (Pixel pro Frame).">
@@ -380,20 +380,20 @@
 
         <label title="1 = folgt den Konturen sklavisch, 0 = Kanten sind nur Startpunkte, alles fällt gerade runter.">
           <span class="head">Kontur-Treue<span class="val" data-for="konturTreue"></span></span>
-          <input type="range" id="konturTreue" min="0" max="1" step="0.05" value="0.8" />
+          <input type="range" id="konturTreue" min="0" max="1" step="0.05" value="1" />
         </label>
 
         <label title="Wie träge die Teilchen umlenken. 0 = sofortige Richtungswechsel, hoch = weite weiche Bögen (dürfen dabei kurz von der Kante abdriften).">
           <span class="head">Trägheit (Bögen)<span class="val" data-for="traegheit"></span></span>
-          <input type="range" id="traegheit" min="0" max="0.95" step="0.05" value="0.7" />
+          <input type="range" id="traegheit" min="0" max="0.95" step="0.05" value="0.1" />
         </label>
 
         <label title="Bereich der Lebensdauer in Frames: jedes Teilchen bekommt zufällig einen Wert zwischen Min und Max, dann startet es woanders neu.">
           <span class="head">Lebensdauer<span class="val" data-for="lebensdauerMin lebensdauerMax"></span></span>
           <div class="dualslider">
             <div class="fill"></div>
-            <input type="range" id="lebensdauerMin" min="5" max="600" value="60" />
-            <input type="range" id="lebensdauerMax" min="5" max="600" value="180" />
+            <input type="range" id="lebensdauerMin" min="5" max="600" value="5" />
+            <input type="range" id="lebensdauerMax" min="5" max="600" value="41" />
           </div>
         </label>
 
@@ -404,17 +404,17 @@
 
         <label title="Strichstärke der Fließspuren.">
           <span class="head">Fluss-Dicke<span class="val" data-for="flussDicke"></span></span>
-          <input type="range" id="flussDicke" min="0.5" max="4" step="0.5" value="1" />
+          <input type="range" id="flussDicke" min="0.5" max="4" step="0.5" value="1.5" />
         </label>
 
         <label title="Transparenz der Fließspuren. Niedrig = zartes Schimmern.">
           <span class="head">Fluss-Deckkraft<span class="val" data-for="flussDeckkraft"></span></span>
-          <input type="range" id="flussDeckkraft" min="0" max="255" value="180" />
+          <input type="range" id="flussDeckkraft" min="0" max="255" value="77" />
         </label>
 
         <label title="Seitliches Zittern/Wandern der Teilchen. 0 = ruhige Bahnen.">
           <span class="head">Wirbel<span class="val" data-for="flussWirbel"></span></span>
-          <input type="range" id="flussWirbel" min="0" max="3" step="0.1" value="0.5" />
+          <input type="range" id="flussWirbel" min="0" max="3" step="0.1" value="2.1" />
         </label>
 
         <label title="Richtung (in Grad), in die frei fließende Teilchen getrieben werden, wenn sie auf keiner Kante mehr sind. 0 = senkrecht runter.">
@@ -424,7 +424,7 @@
 
         <label class="row" title="Farbe der Fließspuren. Tipp: kräftige Farbe wählen, damit sie sich von der Kantenfarbe abhebt.">
           Flussfarbe
-          <input type="color" id="farbeFluss" value="#48a8ff" />
+          <input type="color" id="farbeFluss" value="#ff4422" />
         </label>
       </details>
       <input type="checkbox" id="zeigeFliessen" class="eye-box" checked />

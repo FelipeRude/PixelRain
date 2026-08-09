@@ -6,7 +6,7 @@ Die Regentropfen prallen an den Konturen ab, spritzen als kleine Fontänen weg u
 
 ### ▶️ [Hier direkt im Browser ausprobieren](https://feliperude.github.io/PixelRain/) — nichts zu installieren.
 
-| Regen & Spritzer | Mosaik-Look | Fließendes Wasser |
+| Standard-Look | Mosaik-Look | Fließendes Wasser |
 | :---: | :---: | :---: |
 | ![Regen prallt an den Kanten ab](screenshots/default-rain.png) | ![Raster aus Vierecken mit zufälliger Größe](screenshots/mosaic.png) | ![Wasser fließt an den Konturen entlang](screenshots/flow.png) |
 
